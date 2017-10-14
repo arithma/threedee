@@ -74,8 +74,7 @@ var animate = function() {
         if (y > 0) {
             spheres[i].sphere.position.y = y;
         } else {
-            spheres[i].sphere.position.y = getRandomInt(1, 40);
-            spheres[i].v = getRandomInt(0, 5);
+            spheres[i].sphere.position.y = 0;
         }
     }
 

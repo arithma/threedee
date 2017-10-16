@@ -16,7 +16,7 @@
         this.velocity= velocity;
 
         this.mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(2, 20, 20),
+            new THREE.SphereGeometry(Math.sqrt(mass), 10, 10),
             new THREE.MeshLambertMaterial({ color: 0xff00ff, wireframe: false})
         );
 
@@ -31,13 +31,15 @@
     function World(width, height) {
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(
-            75,
+            60,
             width / height,
-            0.1,
-            1000
+            1,
+            10000
         );
 
-        this.camera.position.set(0, 5, 30);
+        this.camera.position.set(0, 100, 600);
+        this.clock = new THREE.Clock();
+        this.clock.start();
 
         this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(width, height);
@@ -47,12 +49,17 @@
         };
 
         var light1 = new THREE.PointLight();
-        light1.position.set(50, 50, 50);
+        light1.position.set(500, 500, 50);
         this.scene.add(light1);
 
         var light2 = new THREE.PointLight();
-        light2.position.set(-50, -50, 50);
+        light2.position.set(-500, -500, 50);
         this.scene.add(light2);
+        
+        var boxGeometry = new THREE.BoxGeometry( 30, 30, 30 );
+        var boxMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00, wireframe: false})
+        var cube = new THREE.Mesh( boxGeometry, boxMaterial );
+        this.scene.add( cube );
     }
 
     World.prototype.add = function(worldObject) {
@@ -81,19 +88,34 @@
         max = Math.floor(max);
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
+    
+    function rand(min, max) {
+        return Math.random() * (max - min) + min;
+    }
 
     function runDemo(window) {
         var world = new World(window.innerWidth, window.innerHeight);
 
         var spheres = [];
-        for (var i = 0; i < 10; i++) {
-            var x = getRandomInt(-15, 15);
-            var y = getRandomInt(1, 40);
-            var z = getRandomInt(-15, 15);
+        for (var i = 0; i < 400; i++) {
+            var D = 300;
+            var x = getRandomInt(-D, D);
+            var y = getRandomInt(-D, D);
+            var z = getRandomInt(-D, D);
 
-            var mass = getRandomInt(1, 5);
+            var V = 40;
+            var vx = rand(-V, V);
+            var vy = rand(-V, V);
+            var vz = rand(-V, V);
+
+
+            var mass = rand(0, 1);
+            mass = mass * mass;
+            mass = mass * mass;
+            mass = mass * mass;
+            mass *= 50;
             var position = Position(x, y, z);
-            var velocity = Velocity(0, 0, 0);
+            var velocity = Velocity(vx, vy, vz);
 
             var sphere = new Sphere(mass, position, velocity);
 
@@ -101,18 +123,34 @@
             world.add(sphere);
         }
 
-        var gravity = new Force(0, -0.0981, 0);
+        var G = 5000;
+        var dt = 0.01;
 
         world.draw(function() {
+            var time = world.clock.getElapsedTime();
+            var angle = time / 3;
+            var distance = 1 + (1 - Math.exp(-time));
+            world.camera.position.set(Math.cos(angle) * 600 * distance, 50 + 100 * distance, Math.sin(angle) * 600 * distance);
+            world.camera.lookAt( new THREE.Vector3(0, 0, 0) );
+            
             for (var i = 0, l = spheres.length; i < l; i++) {
-                spheres[i].velocity.add(gravity);
+                for (var j = 0; j < l; j++) {
+                    if (i != j) {
+                        var force = Force(0, 0, 0);
+                        var force = spheres[j].position.clone();
+                        force.addScaledVector(spheres[i].position, -1);
+                        var dist = force.length();
+                        if (dist < 0.01) {
+                            continue;
+                        }
+                        force.setLength(G * spheres[j].mass / dist / dist);
+                        
+                        spheres[i].velocity.addScaledVector(force, dt);
+                    }
+                }
 
                 var newPosition = spheres[i].position.clone();
-                newPosition.add(spheres[i].velocity);
-
-                if (newPosition.y < 0) {
-                    newPosition.y = 0;
-                }
+                newPosition.addScaledVector(spheres[i].velocity, dt);
 
                 spheres[i].setPosition(newPosition);
             }
